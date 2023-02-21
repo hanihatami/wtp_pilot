@@ -88,7 +88,7 @@ with col1:
     indicators_ptf1 = go.Figure()
     indicators_ptf1.layout.template = CHART_THEME
     indicators_ptf1.add_trace(go.Indicator(
-        mode = "number",
+        mode = "number+delta",
         value = average__seats_per_DCP,
         number = {'suffix': ""},
         title = {"text": "<br><span style='font-size:1.5em;color:gray'>Seats Sold per DCP</span>"},
@@ -103,7 +103,7 @@ with col1:
 with col2:    
     indicators_ptf2 = go.Figure()
     indicators_ptf2.add_trace(go.Indicator(
-        mode = "number",
+        mode = "number+delta",
         value = average__wtp_per_DCP,
         number = {'suffix': ""},
         title = {"text": "<span style='font-size:1.5em;color:gray'>Average WTP per DCP</span>"},
@@ -132,11 +132,11 @@ with col3:
 with col4:    
     indicators_ptf4 = go.Figure()
     indicators_ptf4.add_trace(go.Indicator(
-        mode = "number",
+        mode = "number+delta",
         value = revenue_generated,
         number = {'suffix': ""},
         title = {"text": "<span style='font-size:1.5em;color:gray'>Revenue $</span>"},
-        delta = {'position': "bottom", 'reference': 0.2, 'relative': False},
+        delta = {'position': "bottom", 'reference': revenue_generated, 'relative': False},
         domain = {'row': 0, 'column': 3}))
     indicators_ptf4.update_layout(
         height=300,
@@ -154,19 +154,23 @@ with col1:
     fig1.add_trace(go.Scatter(x=flight_class_df["date"], y=flight_class_df["WTP"],
                         mode='lines+markers',
                         name='WTP',
-                        line = dict(color='royalblue', width=4)))
+                        line = dict(color='#88cc43', width=4)))
     fig1.add_trace(go.Scatter(x=flight_class_df["date"], y=flight_class_df["air_fare_usd"],
                         mode='lines+markers',
                         name='Price',
-                        line = dict(color='firebrick', width=4)))
+                        line = dict(color='lightgrey', width=4)))
     # Edit the layout
-    fig1.update_layout( xaxis_title='Date',
+    fig1.update_layout( 
+                    width=600,
+                    height=500,
+                    title='Daily WTP vs airfare',
+                    xaxis_title='Date',
                     yaxis_title='$ US Dollar')
     st.plotly_chart(fig1)
 
 df_plot = flight_class_df.copy()
 df_plot["net"] = df_plot["WTP"]-df_plot["air_fare_usd"]
-df_plot["Color"] = np.where(df_plot["net"]<0, 'red', 'green')
+df_plot["Color"] = np.where(df_plot["net"]<0, '#f58787', '#88cc43')
 
 with col2:
     fig2 = go.Figure()
@@ -179,6 +183,9 @@ with col2:
 
     # Edit the layout
     fig2.update_layout( 
+                    width=600,
+                    height=500,
+                    title='Daily difference of WTP and airfare',
                     xaxis_title='Date',
                     yaxis_title='$USD')
 
@@ -186,17 +193,25 @@ with col2:
 
 col1, col2 = st.columns(2)
 with col1:
-    fig3 = px.area(flight_class_df, x="date", y="average_time_onsite", title="Financial Impact, World, RCP = 2.6", color_discrete_sequence=["#FDB714"])
+    fig3 = px.area(flight_class_df, x="date", y="average_time_onsite", title="Financial Impact, World, RCP = 2.6", color_discrete_sequence=["#ffc0cb"])#ffd343##ffb300
     # Edit the layout
-    fig3.update_layout( title = "Average Time On Website",
+    fig3.update_layout(
+                    width=600,
+                    height=500,
+                    title = "Average time on website",
                     xaxis_title='date',
                     yaxis_title='Minutes')
     st.plotly_chart(fig3)
 with col2:
-    colors = ['gold', 'lightblue', 'mediumturquoise', 'darkorange', 'lightgreen', 'blue', 'pink']
+    colors = ['#A9A9A9', '#A2CD5A', '#006400', '#CDC8B1', '#26bf2e', '#77ba7a', '#808080']
 
     fig4 = go.Figure(data=[go.Pie(labels=weekday_wtp['day_name'],
                                 values=np.round(weekday_wtp['WTP'],1))])
     fig4.update_traces(hoverinfo='label+percent', textinfo='value', textfont_size=20,
                     marker=dict(colors=colors, line=dict(color='#000000', width=2)))
+    
+    fig4.update_layout(
+                    width=600,
+                    height=500,
+                    title = "Average daily WTP")
     st.plotly_chart(fig4)
