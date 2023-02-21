@@ -1,7 +1,7 @@
 [app]
 app_intro = """
-This app is an attempt to show case the key results that can be shown in this pilot.
-Here we have used a mock dataset. Although we tried to make numbers realistic but please note that these numbers are synthetic.
+This app is an attempt to showcase the key results that can be shown in this pilot.
+Here we have used a synthetic dataset.
 """
 
 [tooltips]
