@@ -26,6 +26,51 @@ def load_data(file_name: str):
     return pd.read_csv(Path(get_project_root()) / f"wtp_pilot/inputs/{file_name}")
 
 
+def plot_cumulative_booking_and_fare(day, bookings, fares, speed=0.0001):
+    # Create a Streamlit figure and axis
+    fig, ax = plt.subplots()
+    ax.set_xlabel('Day')
+    ax.set_ylabel('Cumulative Booking')
+    ax.set_title('Booking and Fare')
+    ax.grid(True)
+
+    # Create a secondary y-axis for fare
+    ax2 = ax.twinx()
+    ax2.set_ylabel('Fare', color='red')
+    # ax2.set_label_position('right')
+
+    # Plot cumulative booking on the left y-axis
+    booking_cum_sum = bookings.cumsum()
+    line1, = ax.plot(day, booking_cum_sum, marker='o', color='blue', label='Cumulative Booking')
+
+    # Plot fare on the right y-axis
+    line2, = ax2.plot(day, fares, marker='o', color='red', label='Fare')
+
+    # Combine the legends from both axes
+    lines = [line1, line2]
+    ax.legend(lines, [line.get_label() for line in lines])
+    
+    # Create a Streamlit figure placeholder
+    st_figure = st.pyplot(fig)
+
+    # Update the plot dynamically
+    for i in range(len(day)):
+        ax.clear()
+        ax2.clear()
+        line1, = ax.plot(day[:i+1], booking_cum_sum[:i+1], marker='o', color='blue', label='Cumulative Booking')
+        line2, = ax2.plot(day[:i+1], fares[:i+1], marker='o', color='red')
+    
+        ax.set_xlabel('Days')
+        ax.set_ylabel('Cumulative Booking')
+        ax2.set_ylabel('Fare', color='red')
+        ax.set_title('Dynamic Time Series Plot')
+        ax.grid(False)
+        ax2.grid(False)
+        ax.legend(lines, [line.get_label() for line in lines])
+        ax2.legend()
+        st_figure.pyplot(fig)
+        time.sleep(speed)
+
 def plot_no_annimation(day, bookings, fares):
     # Create a Streamlit figure placeholder
     st_figure = st.empty()
@@ -116,7 +161,7 @@ def main():
     # Add a sidebar
     with st.sidebar:
         # Add the logo image at the top
-        st.sidebar.image(load_image("logo.png"), use_column_width=True)
+        st.sidebar.image(load_image("logo.jpg"), use_column_width=True)
 
         # Add a text input for departure and arrival airports
         departure_airport = st.text_input("Departure Airport (e.g., AKL)", "AKL")
@@ -210,76 +255,76 @@ def main():
 
     mock_data['day_name'] = mock_data['date'].dt.day_name()
     weekday_wtp = mock_data.groupby('day_name')['WTP'].mean().reset_index()
-    ################################################################
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        CHART_THEME = 'plotly_white' 
+    # ################################################################
+    # col1, col2, col3, col4 = st.columns(4)
+    # with col1:
+    #     CHART_THEME = 'plotly_white' 
 
-        indicators_ptf1 = go.Figure()
-        indicators_ptf1.layout.template = CHART_THEME
-        indicators_ptf1.add_trace(go.Indicator(
-            mode = "number+delta",
-            value = average__seats_per_DCP,
-            number = {'suffix': ""},
-            title = {"text": "<br><span style='font-size:1.5em;color:gray'>Seats Sold per DCP</span>"},
-            delta = {'position': "bottom", 'reference': average__seats_per_DCP, 'relative': True},
-            domain = {'row': 0, 'column': 0}))
+    #     indicators_ptf1 = go.Figure()
+    #     indicators_ptf1.layout.template = CHART_THEME
+    #     indicators_ptf1.add_trace(go.Indicator(
+    #         mode = "number+delta",
+    #         value = average__seats_per_DCP,
+    #         number = {'suffix': ""},
+    #         title = {"text": "<br><span style='font-size:1.5em;color:gray'>Seats Sold per DCP</span>"},
+    #         delta = {'position': "bottom", 'reference': average__seats_per_DCP, 'relative': True},
+    #         domain = {'row': 0, 'column': 0}))
 
-        indicators_ptf1.update_layout(
-            height=300,
-            width=300
-            )
-        st.plotly_chart(indicators_ptf1)
-    with col2:    
-        indicators_ptf2 = go.Figure()
-        indicators_ptf2.add_trace(go.Indicator(
-            mode = "number+delta",
-            value = average__wtp_per_DCP,
-            number = {'suffix': ""},
-            title = {"text": "<span style='font-size:1.5em;color:gray'>Average WTP per DCP</span>"},
-            delta = {'position': "bottom", 'reference': average__wtp_per_DCP, 'relative': False},
-            domain = {'row': 0, 'column': 1}))
+    #     indicators_ptf1.update_layout(
+    #         height=300,
+    #         width=300
+    #         )
+    #     st.plotly_chart(indicators_ptf1)
+    # with col2:    
+    #     indicators_ptf2 = go.Figure()
+    #     indicators_ptf2.add_trace(go.Indicator(
+    #         mode = "number+delta",
+    #         value = average__wtp_per_DCP,
+    #         number = {'suffix': ""},
+    #         title = {"text": "<span style='font-size:1.5em;color:gray'>Average WTP per DCP</span>"},
+    #         delta = {'position': "bottom", 'reference': average__wtp_per_DCP, 'relative': False},
+    #         domain = {'row': 0, 'column': 1}))
         
-        indicators_ptf2.update_layout(
-            height=300,
-            width=300
-            )
-        st.plotly_chart(indicators_ptf2)
-    with col3:    
-        indicators_ptf3 = go.Figure()
-        indicators_ptf3.add_trace(go.Indicator(
-            mode = "number+delta",
-            value = np.round(average_checkout_rate['checkout_rate'][-1],2),
-            number = {'suffix': " %"},
-            title = {"text": "<span style='font-size:1.5em;color:gray'>Check-out Rate</span>"},
-            delta = {'position': "bottom", 'reference': average_checkout_rate['checkout_rate'][-2], 'relative': False},
-            domain = {'row': 0, 'column': 2}))
-        indicators_ptf3.update_layout(
-            height=300,
-            width=300
-            )
-        st.plotly_chart(indicators_ptf3)
-    with col4:    
-        indicators_ptf4 = go.Figure()
-        indicators_ptf4.add_trace(go.Indicator(
-            mode = "number+delta",
-            value = revenue_generated,
-            number = {'suffix': ""},
-            title = {"text": "<span style='font-size:1.5em;color:gray'>Revenue $</span>"},
-            delta = {'position': "bottom", 'reference': revenue_generated, 'relative': False},
-            domain = {'row': 0, 'column': 3}))
-        indicators_ptf4.update_layout(
-            height=300,
-            width=300
-            )
-        st.plotly_chart(indicators_ptf4)
+    #     indicators_ptf2.update_layout(
+    #         height=300,
+    #         width=300
+    #         )
+    #     st.plotly_chart(indicators_ptf2)
+    # with col3:    
+    #     indicators_ptf3 = go.Figure()
+    #     indicators_ptf3.add_trace(go.Indicator(
+    #         mode = "number+delta",
+    #         value = np.round(average_checkout_rate['checkout_rate'][-1],2),
+    #         number = {'suffix': " %"},
+    #         title = {"text": "<span style='font-size:1.5em;color:gray'>Check-out Rate</span>"},
+    #         delta = {'position': "bottom", 'reference': average_checkout_rate['checkout_rate'][-2], 'relative': False},
+    #         domain = {'row': 0, 'column': 2}))
+    #     indicators_ptf3.update_layout(
+    #         height=300,
+    #         width=300
+    #         )
+    #     st.plotly_chart(indicators_ptf3)
+    # with col4:    
+    #     indicators_ptf4 = go.Figure()
+    #     indicators_ptf4.add_trace(go.Indicator(
+    #         mode = "number+delta",
+    #         value = revenue_generated,
+    #         number = {'suffix': ""},
+    #         title = {"text": "<span style='font-size:1.5em;color:gray'>Revenue $</span>"},
+    #         delta = {'position': "bottom", 'reference': revenue_generated, 'relative': False},
+    #         domain = {'row': 0, 'column': 3}))
+    #     indicators_ptf4.update_layout(
+    #         height=300,
+    #         width=300
+    #         )
+    #     st.plotly_chart(indicators_ptf4)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        plot_no_annimation(filtered_flight_data['simulation_day'], filtered_flight_data['booking'], filtered_flight_data['fare'])
+    # col1, col2 = st.columns(2)
+    # with col1:
+    plot_cumulative_booking_and_fare(filtered_flight_data['simulation_day'], filtered_flight_data['booking'], filtered_flight_data['fare'])
 
-    with col2:
-        create_stacked_bar_chart(tf_wtp_dtd_fare)
+    # with col2:
+    #     create_stacked_bar_chart(tf_wtp_dtd_fare)
 
 if __name__ == '__main__':
     main()
