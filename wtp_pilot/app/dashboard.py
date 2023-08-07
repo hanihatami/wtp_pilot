@@ -29,7 +29,7 @@ with st.expander(
     st.write(readme["app"]["app_intro"])
     st.write("")
 st.write("")
-st.sidebar.image(load_image("logo.png"), use_column_width=True)
+st.sidebar.image(load_image("logo.jpg"), use_column_width=True)
 
 
 st.sidebar.title("1. Data")
@@ -44,7 +44,7 @@ with st.sidebar.expander("Dataset", expanded=True):
             # format_func=lambda x: config["datasets"][x]["name"],
             help=readme["tooltips"]["toy_dataset"]   
         )
-        df = pd.read_csv(Path(get_project_root()) / "wtp_pilot/inputs/wtp_mock_data.csv")
+        df = pd.read_csv(Path(get_project_root()) / "wtp_pilot/inputs/wtp_mock_data3.csv")
 
 
 st.sidebar.title("2. Flight")
@@ -52,7 +52,7 @@ st.sidebar.title("2. Flight")
 with st.sidebar.expander("Flight", expanded=False):
     flight_selected = st.selectbox(
             "Flight Number",
-            ["CX6321"],
+            ["NZ631"],
             help = readme["tooltips"]["select_flight"],
         )
     flight_df = df[df["flight_number"] == flight_selected]
@@ -63,6 +63,15 @@ with st.sidebar.expander("Flight", expanded=False):
             help = readme["tooltips"]["select_class"],
         )
     flight_class_df = flight_df[flight_df["class"] == class_selected]
+    if class_selected == "Economy":
+        txt = ["100", "+80", "+30", "-40", "-20", "wtp"]
+        vals_y = [100, 80, +30, -40, -20, 0]
+        baseline = 500
+    else:
+        txt = ["fare", "+210", "-45", "+150", "+240","wtp"]
+        vals_y = [500, 210, -75, +150, +240, 0]
+        baseline = 5000
+#  x = ["Fare", "WOY", "DOW", "DTD", "SEARCH", "POS", "WTP"],
 
 # fig = go.Figure()
 # colors = {"price": "blue", "wtp": "green"}
@@ -71,15 +80,15 @@ with st.sidebar.expander("Flight", expanded=False):
 # st.plotly_chart(fig)
 ################################################################
 average__seats_per_DCP = flight_class_df.groupby("DCP")["number_of_checkouts"].sum().mean()
-average__wtp_per_DCP = flight_class_df.groupby("DCP")["WTP"].mean().mean()
+average__wtp_per_DCP = flight_class_df.groupby("DCP")["WTP2"].mean().mean()
 
 flight_class_df['date'] = pd.to_datetime(flight_class_df['date'])
 average_checkout_rate = flight_class_df[['date', 'checkout_rate']].set_index('date').resample('W').mean()
 
 revenue_generated = flight_class_df['daily_revenue'].sum()
-
+wtp_revenue_generated = (flight_class_df['WTP2'] * flight_class_df["number_of_checkouts"]).sum()
 flight_class_df['day_name'] = flight_class_df['date'].dt.day_name()
-weekday_wtp = flight_class_df.groupby('day_name')['WTP'].mean().reset_index()
+weekday_wtp = flight_class_df.groupby('day_name')['WTP2'].mean().reset_index()
 ################################################################
 col1, col2, col3, col4 = st.columns(4)
 with col1:
@@ -129,14 +138,17 @@ with col3:
         width=300
         )
     st.plotly_chart(indicators_ptf3)
-with col4:    
+with col4:   
+    ref =  2/3 * revenue_generated if class_selected=='Economy' else 3/4*revenue_generated
     indicators_ptf4 = go.Figure()
     indicators_ptf4.add_trace(go.Indicator(
         mode = "number+delta",
-        value = revenue_generated,
+        value = wtp_revenue_generated,
         number = {'suffix': ""},
         title = {"text": "<span style='font-size:1.5em;color:gray'>Revenue $</span>"},
-        delta = {'position': "bottom", 'reference': revenue_generated, 'relative': False},
+        delta = {'position': "bottom",
+                 'reference': ref,
+                 'relative': False},
         domain = {'row': 0, 'column': 3}))
     indicators_ptf4.update_layout(
         height=300,
@@ -151,7 +163,7 @@ with col4:
 col1, col2 = st.columns(2)
 with col1:
     fig1 = go.Figure()
-    fig1.add_trace(go.Scatter(x=flight_class_df["date"], y=flight_class_df["WTP"],
+    fig1.add_trace(go.Scatter(x=flight_class_df["date"], y=flight_class_df["WTP2"],
                         mode='lines+markers',
                         name='WTP',
                         line = dict(color='#88cc43', width=4)))
@@ -169,7 +181,7 @@ with col1:
     st.plotly_chart(fig1)
 
 df_plot = flight_class_df.copy()
-df_plot["net"] = df_plot["WTP"]-df_plot["air_fare_usd"]
+df_plot["net"] = df_plot["WTP2"]-df_plot["air_fare_usd"]
 df_plot["Color"] = np.where(df_plot["net"]<0, '#f58787', '#88cc43')
 
 with col2:
@@ -193,25 +205,51 @@ with col2:
 
 col1, col2 = st.columns(2)
 with col1:
-    fig3 = px.area(flight_class_df, x="date", y="average_time_onsite", title="Financial Impact, World, RCP = 2.6", color_discrete_sequence=["#ffc0cb"])#ffd343##ffb300
+    fig3 = px.area(flight_class_df, x="date", y="website_visit", title="Financial Impact, World, RCP = 2.6", color_discrete_sequence=["#ffc0cb"])#ffd343##ffb300
     # Edit the layout
     fig3.update_layout(
                     width=600,
                     height=500,
-                    title = "Average time on website",
+                    title = "Number of searches on website",
                     xaxis_title='date',
-                    yaxis_title='Minutes')
+                    yaxis_title='number')
     st.plotly_chart(fig3)
 with col2:
-    colors = ['#A9A9A9', '#A2CD5A', '#006400', '#CDC8B1', '#26bf2e', '#77ba7a', '#808080']
+    # colors = ['#A9A9A9', '#A2CD5A', '#006400', '#CDC8B1', '#26bf2e', '#77ba7a', '#808080']
 
-    fig4 = go.Figure(data=[go.Pie(labels=weekday_wtp['day_name'],
-                                values=np.round(weekday_wtp['WTP'],1))])
-    fig4.update_traces(hoverinfo='label+percent', textinfo='value', textfont_size=20,
-                    marker=dict(colors=colors, line=dict(color='#000000', width=2)))
+    # fig4 = go.Figure(data=[go.Pie(labels=weekday_wtp['day_name'],
+    #                             values=np.round(weekday_wtp['WTP2'],1))])
+    # fig4.update_traces(hoverinfo='label+percent', textinfo='value', textfont_size=20,
+    #                 marker=dict(colors=colors, line=dict(color='#000000', width=2)))
     
+    # fig4.update_layout(
+    #                 width=600,
+    #                 height=500,
+    #                 title = "Average daily WTP")
+    # st.plotly_chart(fig4)
+
+
+
+    fig4 = go.Figure(go.Waterfall(
+        name = "20", orientation = "v",
+        measure = ["absolute", "relative", "relative", "relative", "relative", "total"],
+        x = ["Fare", "WOY", "DOW", "DTD", "SEARCH",  "WTP"],
+        textposition = "outside",
+        text = txt,
+        y = vals_y,
+        base=baseline,
+        connector = {"line":{"color":"rgb(63, 63, 63)"}},
+        increasing = {"marker":{"color": "#88cc43"}},  # Color for increasing bars
+        decreasing = {"marker":{"color": "#f58787"}},  # Color for decreasing bars
+        totals = {"marker":{"color":'lightgrey', "line":{"color":'lightgrey', "width":3}}}
+        # Set custom color for the "Fare" bar
+    ))
+
     fig4.update_layout(
-                    width=600,
-                    height=500,
-                    title = "Average daily WTP")
+            title = "WTP Breakdown",
+            showlegend = False,
+            width=600,
+            height=500
+    )
+
     st.plotly_chart(fig4)
