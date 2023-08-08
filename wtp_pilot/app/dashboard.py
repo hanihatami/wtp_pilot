@@ -44,7 +44,7 @@ with st.sidebar.expander("Dataset", expanded=True):
             # format_func=lambda x: config["datasets"][x]["name"],
             help=readme["tooltips"]["toy_dataset"]   
         )
-        df = pd.read_csv(Path(get_project_root()) / "wtp_pilot/inputs/wtp_mock_data3.csv")
+        df = pd.read_csv(Path(get_project_root()) / "wtp_pilot/inputs/wtp_mock_data4.csv")
 
 
 st.sidebar.title("2. Flight")
