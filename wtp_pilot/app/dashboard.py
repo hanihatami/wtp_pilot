@@ -185,23 +185,29 @@ df_plot["net"] = df_plot["WTP2"]-df_plot["air_fare_usd"]
 df_plot["Color"] = np.where(df_plot["net"]<0, '#f58787', '#88cc43')
 
 with col2:
-    fig2 = go.Figure()
-    fig2.add_trace(
-        go.Bar(name='Net',
-            x=df_plot['date'],
-            y=df_plot['net'],
-            marker_color=df_plot['Color']))
-    fig2.update_layout(barmode='stack')
+    fig4 = go.Figure(go.Waterfall(
+        name = "20", orientation = "v",
+        measure = ["absolute", "relative", "relative", "relative", "relative", "total"],
+        x = ["Fare", "WOY", "DOW", "DTD", "SEARCH",  "WTP"],
+        textposition = "outside",
+        text = txt,
+        y = vals_y,
+        base=baseline,
+        connector = {"line":{"color":"rgb(63, 63, 63)"}},
+        increasing = {"marker":{"color": "#88cc43"}},  # Color for increasing bars
+        decreasing = {"marker":{"color": "#f58787"}},  # Color for decreasing bars
+        totals = {"marker":{"color":'lightgrey', "line":{"color":'lightgrey', "width":3}}}
+        # Set custom color for the "Fare" bar
+    ))
 
-    # Edit the layout
-    fig2.update_layout( 
-                    width=600,
-                    height=500,
-                    title='Daily difference of WTP and airfare',
-                    xaxis_title='Date',
-                    yaxis_title='$USD')
+    fig4.update_layout(
+            title = "WTP Breakdown",
+            showlegend = False,
+            width=600,
+            height=500
+    )
 
-    st.plotly_chart(fig2)
+    st.plotly_chart(fig4)
 
 col1, col2 = st.columns(2)
 with col1:
@@ -228,28 +234,22 @@ with col2:
     #                 title = "Average daily WTP")
     # st.plotly_chart(fig4)
 
+    fig2 = go.Figure()
+    fig2.add_trace(
+        go.Bar(name='Net',
+            x=df_plot['date'],
+            y=df_plot['net'],
+            marker_color=df_plot['Color']))
+    fig2.update_layout(barmode='stack')
 
+    # Edit the layout
+    fig2.update_layout( 
+                    width=600,
+                    height=500,
+                    title='Daily difference of WTP and airfare',
+                    xaxis_title='Date',
+                    yaxis_title='$USD')
 
-    fig4 = go.Figure(go.Waterfall(
-        name = "20", orientation = "v",
-        measure = ["absolute", "relative", "relative", "relative", "relative", "total"],
-        x = ["Fare", "WOY", "DOW", "DTD", "SEARCH",  "WTP"],
-        textposition = "outside",
-        text = txt,
-        y = vals_y,
-        base=baseline,
-        connector = {"line":{"color":"rgb(63, 63, 63)"}},
-        increasing = {"marker":{"color": "#88cc43"}},  # Color for increasing bars
-        decreasing = {"marker":{"color": "#f58787"}},  # Color for decreasing bars
-        totals = {"marker":{"color":'lightgrey', "line":{"color":'lightgrey', "width":3}}}
-        # Set custom color for the "Fare" bar
-    ))
+    st.plotly_chart(fig2)
 
-    fig4.update_layout(
-            title = "WTP Breakdown",
-            showlegend = False,
-            width=600,
-            height=500
-    )
-
-    st.plotly_chart(fig4)
+    
