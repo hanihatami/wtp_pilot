@@ -64,9 +64,9 @@ with st.sidebar.expander("Flight", expanded=False):
         )
     flight_class_df = flight_df[flight_df["class"] == class_selected]
     if class_selected == "Economy":
-        txt = ["100", "+80", "+30", "-40", "-20", "wtp"]
-        vals_y = [100, 80, +30, -40, -20, 0]
-        baseline = 500
+        txt = ["100", "+80", "+50", "-30", "-20", "wtp"]
+        vals_y = [100, 80, +50, -30, -20, 0]
+        baseline = 1000
     else:
         txt = ["fare", "+210", "-45", "+150", "+240","wtp"]
         vals_y = [500, 210, -75, +150, +240, 0]
