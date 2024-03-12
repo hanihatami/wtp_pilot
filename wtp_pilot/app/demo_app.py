@@ -140,6 +140,7 @@ with st.sidebar:
 # - Column 4: Bid Price - Represents the current price point for bidding on seat sales, with a delta showing the change from the previous day.
 # These metrics provide a quick snapshot of the flight's booking status and pricing strategy for revenue management purposes.col1, col2, col3, col4 = st.columns(4)
 
+col1, col2, col3, col4 = st.columns(4)
 with col1:
     available_seats_figure = go.Figure()
     available_seats_figure.add_trace(go.Indicator(
