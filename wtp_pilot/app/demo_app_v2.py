@@ -5,6 +5,8 @@ import datetime as dt
 import os
 from amadeus import Client, ResponseError
 from dotenv import load_dotenv
+import sys
+sys.path.append('/Users/hanih/Documents/Projects/wtp_pilot/wtp_pilot/lib/flights_utils')
 from utils import *
 
 # Load environment variables from .env file
@@ -38,13 +40,13 @@ def main():
     # Dropdown for Departure
     departure = st.sidebar.selectbox(
         "Departure (AKL)",
-        ["AKL", "WLG", "CHC"]  # Example options for departure
+        ["AKL", "WLG"]  # Example options for departure
     )
 
     # Dropdown for Arrival
     arrival = st.sidebar.selectbox(
         "Arrival (SYD)",
-        ["SYD", "MEL", "BNE"]  # Example options for arrival
+        ["SYD", "MEL"]  # Example options for arrival
     )
 
     # Calculate one month from now for the minimum flight date
@@ -92,6 +94,8 @@ def main():
 
             # add price
             top_similar_flights_with_price = pd.merge(top_similar_flights, prices, on= 'ItineraryID')
+            target_flight_price = prices.loc[prices['ItineraryID'] == target_flight['ItineraryID'], 'Total']
+            display_price_distribution_v2(top_similar_flights_with_price, target_flight_price)
     # Display selected options for confirmation
     st.write(f"Departure: {departure}")
     st.write(f"Arrival: {arrival}")
