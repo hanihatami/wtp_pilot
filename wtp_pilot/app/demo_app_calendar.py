@@ -13,7 +13,7 @@ import numpy as np
 import plotly.graph_objects as go
 import calendar
 from plotly.subplots import make_subplots
-
+import random
 
 sys.path.append('/Users/hanih/Documents/Projects/wtp_pilot/wtp_pilot/lib/flight_utils')
 sys.path.append('/Users/hanih/Documents/Projects/wtp_pilot/wtp_pilot/lib/bid_price_utils')
@@ -33,18 +33,78 @@ def load_image(image_name: str):
     image_path = Path(get_project_root()) / f"wtp_pilot/references/{image_name}"
     return Image.open(image_path)
 
+# Cache the function to get flights info
+@st.cache_data
+def cached_get_flights_info(_client, departure, arrival, flight_date, day_range):
+    return get_flights_info(_client, departure, arrival, flight_date, day_range)
+
 def get_top_events_for_april_sydney():
     # Static list of top 5 events with their importance scores and dates
     events = [
-        {"date": "2024-04-01", "name": "Sydney Royal Easter Show", "importance": 95},
-        {"date": "2024-04-15", "name": "The Sydney Comedy Festival", "importance": 90},
-        {"date": "2024-04-25", "name": "ANZAC Day Commemorations", "importance": 85},
-        {"date": "2024-04-12", "name": "Australian Fashion Week", "importance": 80},
-        {"date": "2024-04-27", "name": "Vivid Sydney", "importance": 75},
+        # {"date": "2024-04-01", "name": "Sydney Royal Easter Show", "importance": 95},
+        # {"date": "2024-04-15", "name": "The Sydney Comedy Festival", "importance": 90},
+        # {"date": "2024-04-25", "name": "ANZAC Day Commemorations", "importance": 85},
+        # {"date": "2024-04-12", "name": "Australian Fashion Week", "importance": 80},
+        # {"date": "2024-04-27", "name": "Vivid Sydney", "importance": 75}
+        {"date": "2024-06-05", "name": "Sydney Film Festival", "importance": 95},
+        {"date": "2024-06-12", "name": "Good Food & Wine Show Sydney", "importance": 90},
+        {"date": "2024-06-19", "name": "Sydney Winter Festival", "importance": 85},
+        {"date": "2024-06-26", "name": "State of Origin: Rugby Match", "importance": 80},
+        {"date": "2024-06-30", "name": "Sydney Harbour 10K & 5K", "importance": 75},
     ]
+
     events_df = pd.DataFrame(events)
     return events_df
 
+def generate_price_changes(bid_price, recommended_fare, n, increment=25):
+    """
+    Generate a list of price changes starting with the bid price and ending with the recommended fare.
+    The function will generate 'n' meaningful intermediate changes that are multiples of the increment
+    and include both positive and negative values.
+    
+    :param bid_price: Initial bid price as an integer or float
+    :param recommended_fare: Recommended fare as an integer or float
+    :param n: Number of intermediate steps to generate
+    :param increment: The minimum absolute value for intermediate steps
+    :return: List of strings representing the price changes
+    """
+
+    max_change = recommended_fare // 5  # 1/5th of recommended price as the maximum change
+    price_changes_with_dollar_sign = [f"${bid_price}"]
+    price_changes = [f"{bid_price}"]
+    remaining_change = recommended_fare - bid_price
+    
+    # Adjust the max_change if it's too large compared to the remaining change
+    if abs(max_change) > abs(remaining_change):
+        max_change = remaining_change
+
+    # Generate 'n' intermediate changes as multiples of the increment
+    for i in range(n):
+        # If we're on the last step, the change must bring us to the recommended fare
+        if i == n - 1:
+            change = remaining_change
+        else:
+            # Generate a list of possible changes, ensuring at least two possibilities
+            # and not exceeding max_change
+            min_change = -min(abs(max_change), abs(remaining_change))
+            max_possible_change = min(abs(max_change), abs(remaining_change))
+            possible_changes = list(range(min_change, max_possible_change+1, increment))
+            possible_changes = [x for x in possible_changes if x != 0]  # Remove zero from possible changes
+
+            # Choose a random change
+            change = random.choice(possible_changes)
+
+        # Apply the change and update the remaining change
+        remaining_change -= change
+        sign = '+' if change > 0 else ''
+        price_changes_with_dollar_sign.append(f"{sign}${change}")
+        price_changes.append(f"{sign}{change}")
+    # Add the recommended fare as the final value
+    price_changes_with_dollar_sign.append(f"${recommended_fare}")
+    price_changes.append(f"{recommended_fare}")
+
+    price_changes = [int(i) for i in price_changes]
+    return price_changes_with_dollar_sign, price_changes
 
 # Page config
 st.set_page_config(page_title="Pilot", layout="wide")
@@ -156,7 +216,7 @@ def main():
                     var calendarEl = document.getElementById('calendar');
                     var calendar = new FullCalendar.Calendar(calendarEl, {{
                         plugins: ['interaction', 'dayGrid'],
-                        defaultDate: '2024-04-01',
+                        defaultDate: '2024-06-01',
                         header: {{
                             left: '',
                             center: 'title',
@@ -164,15 +224,15 @@ def main():
                         }},
                         fixedWeekCount: false,
                         validRange: {{
-                            start: '2024-03-31',
-                            end: '2024-05-06'
+                            start: '2024-06-01',
+                            end: '2024-07-01'
                         }},
                         dateClick: function(info) {{
-                            alert('Clicked on: ' + info.dateStr);
+                            Streamlit.setSessionState('clicked_date', info.dateStr);
                         }},
                         dayRender: function(info) {{
                             var cell = info.el;
-                            var randomColor = Math.random() < 0.5 ? '#ffcccc' : '#ccffcc';
+                            var randomColor = Math.random() < 0.5 ? '#F2D7D5' : '#A9DFBF';
                             cell.style.backgroundColor = randomColor;
                         }}
                     }});
@@ -224,7 +284,285 @@ def main():
         # Embed the events HTML into the Streamlit app
         components.html(events_html, height=600)  # Adjust height as needed
 
+    # Sidebar date selection
+    min_date = dt.date(2024, 6, 1)  # Start of June 2024
+    max_date = dt.date(2024, 6, 30)  # End of June 2024
+    default_date = min_date  # Default to the start of the month
+    
+    flight_date = st.sidebar.date_input(
+        "Select a Date",
+        value=default_date,
+        min_value=min_date,
+        max_value=max_date,
+    )
+    # Convert the departure date to a seed by taking the total number of days since a fixed date
+    fixed_date = dt.datetime.strptime("2000-01-01", "%Y-%m-%d").date()
+    seed = (flight_date - fixed_date).days
+    random.seed(seed)  # Seed the random number generator
+
+    if True:
+        with st.spinner('Fetching flight information...'):
+            try:
+                flights_info = cached_get_flights_info(amadeus, departure, arrival, flight_date, day_range=0)
+                segments, fares, flights, prices = parse_flight_details(flights_info)
+                NZ_nonStop_flights, non_NZ_flights, nonStop_nonNz_flights_carrier_codes = filter_and_merge_flights(segments, flights, fares)
+                NZ_flights_for_DepartureDay = filter_flights_by_departure_date(NZ_nonStop_flights, flight_date)
+
+                if NZ_flights_for_DepartureDay.shape[0] > 0:
+                    departure_times = NZ_flights_for_DepartureDay['DepartureTime'].unique()
+                    departure_times = sorted(departure_times)
+                    selected_time = st.sidebar.selectbox(
+                        "Time of Flight",
+                        options=departure_times,
+                        index=0,
+                        format_func=lambda x: x.strftime('%H:%M') if isinstance(x, dt.time) else x
+                    )
+                else:
+                    st.sidebar.write("No flights found for the selected criteria.")
+            except ResponseError as e:
+                st.error('Failed to fetch flight information. Please try again later.')
+
+            target_flight = NZ_flights_for_DepartureDay[NZ_flights_for_DepartureDay['DepartureTime'] == selected_time].iloc[0]
+            cabin_capacities = {"ECONOMY": 180, "BUSINESS":  30, "FIRST CLASS": 10}
+            target_flight['Capacity'] = cabin_capacities.get(target_flight['Cabin'])
+
+            # Ensure that target_flight['Capacity'] is not None or 0 to avoid errors
+            available_seats = st.sidebar.slider(
+                "Select Available Seats",
+                min_value=1,
+                max_value=target_flight['Capacity'],
+                value=1  # Default value
+    )
+            days_to_departure = (flight_date - today).days
+
+            top_similar_flights = find_top_n_similar_flights(target_flight, non_NZ_flights, n=20)
+
+            # add price
+            top_similar_flights_with_price = pd.merge(top_similar_flights, prices, on= 'ItineraryID')
+            target_flight_price = prices.loc[prices['ItineraryID'] == target_flight['ItineraryID'], 'Total']
+
+            demand_rate_per_tf = generate_demand_rates(target_flight, num_tfs=10)
+            bid_calculator = BidCalculator((100, 250), 'ECONOMY', flight_date, demand_rate_per_tf, 1)
+            optimal_bid_prices = bid_calculator.calculate_bid_price(seats=target_flight['Capacity'], time=days_to_departure + 1)
 
 
+
+    # Extract unique carrier codes
+    unique_carrier_codes = nonStop_nonNz_flights_carrier_codes['CarrierCode'].unique().tolist()
+
+    # Create the multiselect widget in the sidebar
+    selected_carriers = st.sidebar.multiselect(
+        'Choose carrier codes:',
+        options=unique_carrier_codes,
+        default=unique_carrier_codes  # Optionally set a default value
+    )
+    if selected_carriers:
+        # Filter the DataFrame based on selected carrier codes
+        filtered_df = nonStop_nonNz_flights_carrier_codes[nonStop_nonNz_flights_carrier_codes['CarrierCode'].isin(selected_carriers)]
+    
+    filtered_df_with_prices = pd.merge(filtered_df, prices, on= 'ItineraryID')
+    # Sample data
+    airlines = ["Air NZ", 'Competitors (Non-Stop)', 'Competitors (With Stops)', 'Selected Competitors']
+
+    target_flight_price = target_flight_price.values[0]
+    competition_prices_per_type = top_similar_flights_with_price.groupby('IsNonStop')['Total'].mean()
+    competition_prices_non_stop = competition_prices_per_type[True]
+    competition_prices_with_stop = competition_prices_per_type[False]
+    selected_competition_prices = filtered_df_with_prices['Total'].mean()
+    prices = [target_flight_price, competition_prices_non_stop, competition_prices_with_stop, selected_competition_prices]
+
+    # Define your color palette
+    colors = ['#517fa4', '#62975c', '#8a5fa2', '#e3a448']  # Muted shades of blue, green, purple, and orange
+    colors = ['#A9CCE3', '#A9DFBF', '#D7BDE2', '#F9E79F']  # Light blue, light green, light purple, light yellow
+    # colors = ['#FAD7A0', '#E59866', '#D2B4DE', '#AED6F1']  # Peach, orange, lavender, light blue
+    # colors = ['#E8DAEF', '#D5F5E3', '#D4E6F1', '#FCF3CF']  # Lilac, mint, baby blue, pale yellow
+    # colors = ['#E6B0AA', '#F5CBA7', '#A3E4D7', '#FDEBD0']  # Dusty pink, apricot, teal, cream
+    colors = ['#F2D7D5', '#D7DBDD', '#A9DFBF', '#AED6F1']  # Soft pink, grey blue, seafoam, cornflower blue
+
+    # Create the bar chart
+    fig = go.Figure([go.Bar(x=airlines, y=prices, marker_color=colors)])
+
+    # Customize the layout
+    # fig.update_layout(
+    #     title='Market Price Positioning',
+    #     xaxis_title='Airlines',
+    #     yaxis_title='Price (€)',
+    #     template='plotly_white'
+    # )
+    # Customize the layout
+    # Define the colors used in your bar chart
+
+
+
+    # The font used throughout your app
+    font_family = "Arial, Helvetica, sans-serif"
+    fig.update_layout(
+        title='Market Price Positioning',
+        title_font=dict(family=font_family, size=22, color='black'),  # Match title style
+        xaxis=dict(
+            title='Airlines',
+            title_font=dict(family=font_family, size=18, color='black'),  # Match axis title style
+            tickfont=dict(family=font_family, size=14, color='black')  # Match axis tick labels
+        ),
+        yaxis=dict(
+            title='Price (€)',
+            title_font=dict(family=font_family, size=18, color='black'),  # Match axis title style
+            tickfont=dict(family=font_family, size=14, color='black')  # Match axis tick labels
+        ),
+        paper_bgcolor='rgba(0,0,0,0)',  # Transparent background
+        plot_bgcolor='rgba(240, 240, 240, 0.8)',  # Light grey background, adjust opacity as needed
+        barmode='group',
+        height=600, width=800
+        )
+
+    # Set font for the bar labels, if you have them
+    fig.update_traces(textfont=dict(family=font_family, size=16, color='black'))
+
+
+    plot_bgcolor = 'rgba(0,0,0,0)'  # This sets the background transparent
+    paper_bgcolor = 'rgba(240, 240, 240, 0.8)'  # Streamlit's default grey background
+
+    # Display the figure in the Streamlit app
+    col1, col2, col3 = st.columns([1,4,1])  # Adjust the ratio as needed
+    with col2:
+        st.plotly_chart(fig)
+    # Add a horizontal line
+    st.markdown("---")
+    # spacer, col1, col2, col3, col4, spacer = st.columns([0.5, 10, 10, 10, 10, 1])
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        available_seats_figure = go.Figure()
+        available_seats_figure.add_trace(go.Indicator(
+            mode="number",
+            value=available_seats,
+            number={'suffix': ""},
+            title={"text": "<span style='font-size:1.5em;color:gray'>Available Seats</span>"} # Set overall figure background color
+        ))
+        available_seats_figure.update_layout(height=300, width=300,
+                                             plot_bgcolor=plot_bgcolor, 
+                                             paper_bgcolor=paper_bgcolor)
+        st.plotly_chart(available_seats_figure)
+
+    with col2:
+        load_factor_figure = go.Figure()
+        load_factor_figure.add_trace(go.Indicator(
+            mode="number",
+            value=int((target_flight['Capacity'] - available_seats)/target_flight['Capacity'] * 100),
+            number={'suffix': "%"},
+            title={"text": "<span style='font-size:1.5em;color:gray'>Load Factor</span>"}
+        ))
+        load_factor_figure.update_layout(height=300, width=300,
+                                         plot_bgcolor=plot_bgcolor, 
+                                         paper_bgcolor=paper_bgcolor)
+        st.plotly_chart(load_factor_figure)
+
+    with col3:
+        dtd_figure = go.Figure()
+        dtd_figure.add_trace(go.Indicator(
+            mode="number",
+            value=days_to_departure,
+            number={'suffix': ""},
+            title={"text": "<span style='font-size:1.5em;color:gray'>Days to Departure</span>"}
+        ))
+        dtd_figure.update_layout(height=300, width=300,
+                                 plot_bgcolor=plot_bgcolor, 
+                                 paper_bgcolor=paper_bgcolor)
+        st.plotly_chart(dtd_figure)
+
+    bid_price = max(100, int(optimal_bid_prices[(available_seats, days_to_departure)]))
+    with col4:
+        bid_price_figure = go.Figure()
+        bid_price_figure.add_trace(go.Indicator(
+            mode="number+delta",
+            value=bid_price,
+            delta={'reference': int(optimal_bid_prices[(available_seats+1, days_to_departure+1)]), 'valueformat': ".2f"},
+            number={'prefix': "$"},
+            title={"text": "<span style='font-size:1.5em;color:gray'>Bid Price</span>"}
+        ))
+        bid_price_figure.update_layout(height=300, width=300,
+                                       plot_bgcolor=plot_bgcolor, 
+                                       paper_bgcolor=paper_bgcolor)
+        st.plotly_chart(bid_price_figure)
+        ##################################################################
+    n=4
+    # if bid price is more than 200 then recommended price is up to 80 euros more than competitor non_stop
+    # if bid price is less than 200 then recommended price is between -20 to +20 of the minimum selected competitors
+    # if bid_price >= 200:
+    #     recommended_price = competition_prices_non_stop 
+    # elif bid_price <= 200 and bid_price >= 150:
+    #     recommended_price = 
+    # else:
+    #     recommended_price = filtered_df_with_prices['Total'].min() 
+
+    # Assuming competition_prices_non_stop and filtered_df_with_prices are already defined
+    max_bid_price = 250
+    if bid_price > 200:
+        # Proportionally increase the price by a value between 50 to 100 based on the difference from 200
+        proportion = (bid_price - 200) / (max_bid_price - 200)  # max_bid_price is the maximum bid price observed or a set limit
+        increase = proportion * (100 - 50) + 50  # Scale the proportion by the range (100 - 50) and add the minimum (50)
+        recommended_price = int(competition_prices_non_stop + increase)
+    elif bid_price < 150:
+        # Adjust the price by a value between -20 to +20 of the minimum selected competitors prices
+        adjustment = random.uniform(-20, 20)
+        recommended_price = int(filtered_df_with_prices['Total'].min() + adjustment)
+    else:
+        # Proportionally increase the price by a value between 30 to 50 based on the difference from 200
+        proportion = (bid_price - 150) / (200 - 150)  # This is assuming bid_price is less than 150
+        increase = proportion * (50 - 30) + 30  # Scale the proportion by the range (50 - 30) and add the minimum (30)
+        recommended_price = int(competition_prices_non_stop + increase)
+
+    txt, vals_y= generate_price_changes(bid_price, recommended_price, n, increment=25)
+    # txt = ['$500', '$-2', '$-28', '$-56', '$-39', '$375']
+    # vals_y = [500, 100, -50, 25, -200, 375]
+    key_drivers =  ["WOY", "DOW", "DTD", "SEARCH" ]
+    # chose n key driver
+    # key_drivers_subset = random.sample(key_drivers, n)
+    key_drivers_subset = key_drivers
+    baseline = 0
+   
+    # Layout setup for columns
+    col1, col2, col3 = st.columns([1, 3, 1])
+
+    with col2:
+        # Creating the waterfall chart
+
+        # Assuming these are the colors used in your app, adjust as necessary
+        color_for_increasing = '#A9DFBF' # Greenish shade
+        color_for_decreasing = '#F2D7D5'  # Reddish shade
+        color_for_totals = '#D7DBDD'   # Grey shade
+        font_family = "Arial, Helvetica, sans-serif"  # The font used in the rest of your app
+
+        wtp_breakdown_figure = go.Figure(go.Waterfall(
+            name="20", 
+            orientation="v",
+            measure=["absolute", "relative", "relative", "relative", "relative", "total"],
+            x=["Bid Price"] + key_drivers_subset +  ["Recommended Fare"],
+            textposition="outside",
+            text=txt,
+            y=vals_y,
+            base=baseline,
+            connector={"line":{"color":"rgb(63, 63, 63)"}},
+            increasing=dict(marker=dict(color=color_for_increasing)),
+            decreasing=dict(marker=dict(color=color_for_decreasing)),
+            totals=dict(marker=dict(color=color_for_totals)),
+        ))
+
+        wtp_breakdown_figure.update_layout(
+            title="WTP Breakdown",
+            title_font=dict(family=font_family, size=22, color='black'),
+            font=dict(family=font_family, size=14, color='black'),
+            waterfallgap=0.3,  # Adjust the gap between bars if needed
+            # Set the rest of the layout properties as required
+            height=600, width=800
+        )
+        # Apply consistent colors and font styles to the axis titles
+        wtp_breakdown_figure.update_xaxes(title_font=dict(family=font_family, size=16, color='black'))
+        wtp_breakdown_figure.update_yaxes(title_font=dict(family=font_family, size=16, color='black'))
+
+        # Displaying the chart in Streamlit
+        st.plotly_chart(wtp_breakdown_figure)
+
+            
+                # display_price_distribution_v2(top_similar_flights_with_price, target_flight_price)
 if __name__ == "__main__":
     main()
