@@ -447,6 +447,22 @@ def main():
     # colors = ['#E8DAEF', '#D5F5E3', '#D4E6F1', '#FCF3CF']  # Lilac, mint, baby blue, pale yellow
     # colors = ['#E6B0AA', '#F5CBA7', '#A3E4D7', '#FDEBD0']  # Dusty pink, apricot, teal, cream
     colors = ['#F2D7D5', '#D7DBDD', '#A9DFBF', '#AED6F1', '#F9E79F', '#A9CCE3']  # Soft pink, grey blue, seafoam, cornflower blue
+    
+    
+    carrier_color_mapping = {
+    'Jetstar': '#F2D7D5', # Adjust these colors as needed for each carrier
+    'Latam': '#D7DBDD',
+    'Air New Zealand': '#A9DFBF',
+    'Qantas': '#AED6F1',
+    'Air Tahiti Nui': '#F9E79F',
+    'Fiji Airways': '#A9CCE3',
+    'China Eastern': '#D7BDE2',
+    'Air Vanuatu': '#e3a448',
+    'Aircalin': '#8a5fa2'
+    }
+
+    # Add more carriers and their colors here
+
     # Convert prices to string with dollar sign for display
     # price_labels = ['$' + '{:.2f}'.format(price) for price in prices]
     non_stops_prices = [float(price.strip('NZ$')) for price in non_stops_price_labels]
@@ -474,6 +490,7 @@ def main():
     one_stop_airlines = list(sorted_onestop_airlines)[:5]
     one_stop_logo_urls = list(sorted_onestop_logo_urls)[:5]
 
+    colors = [carrier_color_mapping[carrier] for carrier in non_stops_airlines]
     # Create the bar chart
     fig_non_stops = go.Figure([go.Bar(x=non_stops_airlines, y=non_stops_prices, text=non_stops_price_labels, textposition='auto', marker_color=colors)])
     ################################
@@ -512,12 +529,13 @@ def main():
                 sizex=0.2,
                 sizey=max(non_stops_prices) * 0.1,  # Adjust size relative to your y-axis scale
                 xanchor="center",
-                yanchor="middle"
+                yanchor="middle",
             )
         )
 
 
     # Create a bar chart for one-stop flights
+    colors = [carrier_color_mapping[carrier] for carrier in one_stop_airlines]
     fig_one_stops = go.Figure(
         [go.Bar(
             x=one_stop_airlines,
@@ -587,8 +605,10 @@ def main():
         )
 
     # Set font for the bar labels, if you have them
+    color = carrier_color_mapping.get(airline, '#A9CCE3')
     fig_one_stops.update_traces(textfont=dict(family=font_family, size=16, color='black'))
     
+        
 
     plot_bgcolor = 'rgba(0,0,0,0)'  # This sets the background transparent
     paper_bgcolor = 'rgba(240, 240, 240, 0.8)'  # Streamlit's default grey background
