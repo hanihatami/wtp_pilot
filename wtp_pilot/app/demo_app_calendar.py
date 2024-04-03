@@ -234,6 +234,17 @@ def main():
                 <script src='https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/4.2.0/interaction/main.min.js'></script>
                 <script src='https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/4.2.0/daygrid/main.min.js'></script>
                 <script>
+                // LCG parameters
+                const a = 1664525;
+                const c = 1013904223;
+                const m = 2 ** 32;
+                var seed = 1234567890; // Example seed; you can change it
+
+                // Seedable pseudo-random number generator
+                function seededRandom() {{
+                    seed = (a * seed + c) % m;
+                    return seed / m;
+                }}
                 document.addEventListener('DOMContentLoaded', function() {{
                     var calendarEl = document.getElementById('calendar');
                     var calendar = new FullCalendar.Calendar(calendarEl, {{
@@ -254,7 +265,7 @@ def main():
                         }},
                         dayRender: function(info) {{
                             var cell = info.el;
-                            var randomColor = Math.random() < 0.5 ? '#F2D7D5' : '#A9DFBF';
+                            var randomColor = seededRandom() < 0.5 ? '#F2D7D5' : '#A9DFBF';
                             cell.style.backgroundColor = randomColor;
                         }}
                     }});
