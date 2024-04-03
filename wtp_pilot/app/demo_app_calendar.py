@@ -194,10 +194,32 @@ def main():
             .events-table tr {
                 min-height: 50px; /* Adjust the height as needed */
             }
+            /* Assuming 'min-price-comparison-table' is the class of your table */
+            .min-price-comparison-table {
+                width: 100%; /* Adjust the width as needed */
+                table-layout: fixed; /* This makes your columns have fixed width */
+                border-collapse: collapse;
+            }
+
+            .min-price-comparison-table th, 
+            .min-price-comparison-table td {
+                text-align: center;
+                border: 1px solid black; /* for visibility */
+            }
+
+            /* Assuming 'all-flights-col' is the class for the first column cells with the logos */
+            .min-price-comparison-table .all-flights-col {
+                width: 20%; /* Adjust the width as needed */
+            }
+
+            /* Assuming 'flight-info-col' is the class for the rest of the columns */
+            .min-price-comparison-table .flight-info-col {
+                width: 10%; /* Adjust the width as needed */
+            }
                 </style>
         """
     # Using columns to place the calendar and the events side by side
-    col1, col2 = st.columns([3, 2.5])  # Adjust the ratio as per your layout needs
+    col1, col2 = st.columns([3, 3])  # Adjust the ratio as per your layout needs
     with col1:
         # Enhanced HTML, CSS, and JS for the calendar
         calendar_html = f"""
@@ -299,6 +321,20 @@ def main():
     fixed_date = dt.datetime.strptime("2000-01-01", "%Y-%m-%d").date()
     seed = (flight_date - fixed_date).days
     random.seed(seed)  # Seed the random number generator
+    carrier_mapping = {
+    'JQ': 'Jetstar',
+    'LA': 'Latam',
+    'NZ': 'Air New Zealand',
+    'QF': 'Qantas',
+    'TN': 'Air Tahiti Nui',
+    'FJ': 'Fiji Airways',
+    'MU': 'China Eastern',
+    'NF': 'Air Vanuatu',
+    'SB': 'Aircalin'
+    }
+
+    # logo_mapping = {carrier : Path(get_project_root()) / f"wtp_pilot/references/carrier_logos/{carrier}-logo.png" for carrier in carrier_mapping.values()}
+    logo_mapping = {carrier : f'https://raw.githubusercontent.com/hanihatami/wtp_pilot/master/wtp_pilot/references/carrier_logos/{carrier}-logo.png' for carrier  in carrier_mapping.values()}
 
     if True:
         with st.spinner('Fetching flight information...'):
@@ -308,6 +344,21 @@ def main():
                 NZ_nonStop_flights, non_NZ_flights, nonStop_nonNz_flights_carrier_codes = filter_and_merge_flights(segments, flights, fares)
                 NZ_flights_for_DepartureDay = filter_flights_by_departure_date(NZ_nonStop_flights, flight_date)
 
+                flights_with_one_stops = flights[flights['NumberOfStops'] == 1]
+                flights_with_no_stops = flights[flights['NumberOfStops'] == 0]
+                flights_with_one_stops_with_price = pd.merge(flights_with_one_stops, prices, on= 'ItineraryID')
+                flights_with_no_stops_with_price = pd.merge(flights_with_no_stops, prices, on= 'ItineraryID')
+                flights_with_one_stops_with_price_with_carrier_codes = pd.merge(flights_with_one_stops_with_price, segments[['ItineraryID', 'FlightID', 'CarrierCode']], on= 'ItineraryID')
+                flights_with_no_stops_with_price_with_carrier_codes = pd.merge(flights_with_no_stops_with_price, segments[['ItineraryID', 'FlightID', 'CarrierCode']], on= 'ItineraryID')
+                market_df = create_min_price_comparison_table(flights_with_no_stops_with_price_with_carrier_codes, 
+                                                  flights_with_one_stops_with_price_with_carrier_codes,
+                                                  carrier_mapping,
+                                                  logo_mapping)
+                # html_table_with_classes = add_classes_to_table_html(market_html)
+                # col1, col2, col3 = st.columns([1,4,1])  # Adjust the ratio as needed
+                # with col2:
+                #     components.html(html_table_with_classes, height=300, width=2000)
+                
                 if NZ_flights_for_DepartureDay.shape[0] > 0:
                     departure_times = NZ_flights_for_DepartureDay['DepartureTime'].unique()
                     departure_times = sorted(departure_times)
@@ -359,73 +410,193 @@ def main():
     if selected_carriers:
         # Filter the DataFrame based on selected carrier codes
         filtered_df = nonStop_nonNz_flights_carrier_codes[nonStop_nonNz_flights_carrier_codes['CarrierCode'].isin(selected_carriers)]
-    
+    ####
     filtered_df_with_prices = pd.merge(filtered_df, prices, on= 'ItineraryID')
-    # Sample data
-    airlines = ["Air NZ", 'Competitors (Non-Stop)', 'Competitors (With Stops)', 'Selected Competitors']
 
-    target_flight_price = target_flight_price.values[0]
+    non_stops_flights = market_df[market_df['NonStopMinPrice'] != '--']
+    one_stop_flights = market_df[market_df['OneStopMinPrice'] != '--']
+    
+    # Sample data
+    # airlines = ["Air NZ", 'Competitors (Non-Stop)', 'Competitors (With Stops)', 'Selected Competitors']
+    non_stops_airlines = list(non_stops_flights['CarrierCode'].values)
+    one_stop_airlines = list(one_stop_flights['CarrierCode'].values)
+
+    # target_flight_price = target_flight_price.values[0]
     competition_prices_per_type = top_similar_flights_with_price.groupby('IsNonStop')['Total'].mean()
     competition_prices_non_stop = competition_prices_per_type[True]
-    competition_prices_with_stop = competition_prices_per_type[False]
-    selected_competition_prices = filtered_df_with_prices['Total'].mean()
-    prices = [target_flight_price, competition_prices_non_stop, competition_prices_with_stop, selected_competition_prices]
-
+    # competition_prices_with_stop = competition_prices_per_type[False]
+    # selected_competition_prices = filtered_df_with_prices['Total'].mean()
+    # prices = [target_flight_price, competition_prices_non_stop, competition_prices_with_stop, selected_competition_prices]
+    non_stops_price_labels = list(non_stops_flights['NonStopMinPrice'].values)
+    one_stop_price_labels = list(one_stop_flights['OneStopMinPrice'].values)
     # Define your color palette
     colors = ['#517fa4', '#62975c', '#8a5fa2', '#e3a448']  # Muted shades of blue, green, purple, and orange
     colors = ['#A9CCE3', '#A9DFBF', '#D7BDE2', '#F9E79F']  # Light blue, light green, light purple, light yellow
     # colors = ['#FAD7A0', '#E59866', '#D2B4DE', '#AED6F1']  # Peach, orange, lavender, light blue
     # colors = ['#E8DAEF', '#D5F5E3', '#D4E6F1', '#FCF3CF']  # Lilac, mint, baby blue, pale yellow
     # colors = ['#E6B0AA', '#F5CBA7', '#A3E4D7', '#FDEBD0']  # Dusty pink, apricot, teal, cream
-    colors = ['#F2D7D5', '#D7DBDD', '#A9DFBF', '#AED6F1']  # Soft pink, grey blue, seafoam, cornflower blue
+    colors = ['#F2D7D5', '#D7DBDD', '#A9DFBF', '#AED6F1', '#F9E79F', '#A9CCE3']  # Soft pink, grey blue, seafoam, cornflower blue
+    # Convert prices to string with dollar sign for display
+    # price_labels = ['$' + '{:.2f}'.format(price) for price in prices]
+    non_stops_prices = [float(price.strip('NZ$')) for price in non_stops_price_labels]
+    one_stop_prices = [float(price.strip('NZ$')) for price in one_stop_price_labels]
+
+    non_stop_logo_urls = list(non_stops_flights['Logo'].values)
+    one_stop_logo_urls = list(one_stop_flights['Logo'].values)
+
+    # Pair each airline with its corresponding price and sort by price
+    paired_sorted_nonstops = sorted(zip(non_stops_prices, non_stops_price_labels, non_stops_airlines, non_stop_logo_urls))
+    paired_sorted_onestop = sorted(zip(one_stop_prices, one_stop_price_labels, one_stop_airlines, one_stop_logo_urls))
+
+    # Unzip the pairs to get sorted prices and corresponding airlines
+    sorted_nonstops_prices, sorted_nonstops_price_lables, sorted_nonstops_airlines, sorted_nonstops_logo_urls  = zip(*paired_sorted_nonstops)
+    sorted_onestop_prices, sorted_onestop_price_lables, sorted_onestop_airlines, sorted_onestop_logo_urls = zip(*paired_sorted_onestop)
+
+    # Convert the tuples back to lists
+    non_stops_prices = list(sorted_nonstops_prices)[:5]
+    non_stops_price_labels = list(sorted_nonstops_price_lables)[:5]
+    non_stops_airlines = list(sorted_nonstops_airlines)[:5]
+    non_stop_logo_urls = list(sorted_nonstops_logo_urls)[:5]
+
+    one_stop_prices = list(sorted_onestop_prices)[:5]
+    one_stop_price_labels = list(sorted_onestop_price_lables)[:5]
+    one_stop_airlines = list(sorted_onestop_airlines)[:5]
+    one_stop_logo_urls = list(sorted_onestop_logo_urls)[:5]
 
     # Create the bar chart
-    fig = go.Figure([go.Bar(x=airlines, y=prices, marker_color=colors)])
+    fig_non_stops = go.Figure([go.Bar(x=non_stops_airlines, y=non_stops_prices, text=non_stops_price_labels, textposition='auto', marker_color=colors)])
+    ################################
 
-    # Customize the layout
-    # fig.update_layout(
-    #     title='Market Price Positioning',
-    #     xaxis_title='Airlines',
-    #     yaxis_title='Price (€)',
-    #     template='plotly_white'
-    # )
-    # Customize the layout
-    # Define the colors used in your bar chart
+    # # Convert prices to string with dollar sign for display
+    # price_labels = ['$' + '{:.2f}'.format(price) for price in prices]
+
+    # # Create the bar chart
+    # fig = go.Figure([go.Bar(x=airlines, y=prices, text=price_labels, textposition='auto', marker_color=colors)])
+
+    # # Annotations for the logos, assuming you have the URLs or paths to the logo images
+    # logo_urls = [
+    #     'https://raw.githubusercontent.com/hanihatami/wtp_pilot/master/wtp_pilot/references/Air%20New%20Zealand-logo.png',
+    #     'https://raw.githubusercontent.com/hanihatami/wtp_pilot/master/wtp_pilot/references/Air%20New%20Zealand-logo.png',
+    #     'https://raw.githubusercontent.com/hanihatami/wtp_pilot/master/wtp_pilot/references/Air%20New%20Zealand-logo.png',
+    #     'https://raw.githubusercontent.com/hanihatami/wtp_pilot/master/wtp_pilot/references/Air%20New%20Zealand-logo.png',
+    #     'https://raw.githubusercontent.com/hanihatami/wtp_pilot/master/wtp_pilot/references/Air%20New%20Zealand-logo.png'
+    # ]
+    
+    
+    # st.text(logo_urls[0])
+    # non_stop_logo_urls = logo_urls
+
+    # Calculate positions for the logos. This might require some tweaking.
+    y_positions_non_stops = [price / 4 for price in non_stops_prices]  # Adjust the offset as necessary
+
+    # Add logos as annotations
+    for i, airline in enumerate(non_stops_airlines):
+        fig_non_stops.add_layout_image(
+            dict(
+                source=non_stop_logo_urls[i],
+                x=airline,
+                y=y_positions_non_stops[i],
+                xref="x",
+                yref="y",
+                sizex=0.2,
+                sizey=max(non_stops_prices) * 0.1,  # Adjust size relative to your y-axis scale
+                xanchor="center",
+                yanchor="middle"
+            )
+        )
+
+
+    # Create a bar chart for one-stop flights
+    fig_one_stops = go.Figure(
+        [go.Bar(
+            x=one_stop_airlines,
+            y=one_stop_prices,
+            text=one_stop_price_labels,
+            textposition='auto',
+            marker_color=colors  # Make sure you have enough colors
+        )]
+    )
+    
+    y_positions_one_stop = [price / 4 for price in one_stop_prices]  # Adjust as necessary
+
+    for i, airline in enumerate(one_stop_airlines):
+        fig_one_stops.add_layout_image(
+            dict(
+                source=one_stop_logo_urls[i],  # Make sure you don't go out of bounds
+                x=airline,
+                y=y_positions_one_stop[i],
+                xref="x",
+                yref="y",
+                sizex=0.2,
+                sizey=max(one_stop_prices) * 0.1,  # Adjust size relative to your y-axis scale
+                xanchor="center",
+                yanchor="middle"
+            )
+        )
 
 
 
     # The font used throughout your app
     font_family = "Arial, Helvetica, sans-serif"
-    fig.update_layout(
+    fig_non_stops.update_layout(
         title='Market Price Positioning',
         title_font=dict(family=font_family, size=22, color='black'),  # Match title style
         xaxis=dict(
-            title='Airlines',
+            title='Nonstops',
             title_font=dict(family=font_family, size=18, color='black'),  # Match axis title style
             tickfont=dict(family=font_family, size=14, color='black')  # Match axis tick labels
         ),
-        yaxis=dict(
-            title='Price (€)',
-            title_font=dict(family=font_family, size=18, color='black'),  # Match axis title style
-            tickfont=dict(family=font_family, size=14, color='black')  # Match axis tick labels
+        yaxis=dict(showticklabels=False, showgrid=False
         ),
         paper_bgcolor='rgba(0,0,0,0)',  # Transparent background
         plot_bgcolor='rgba(240, 240, 240, 0.8)',  # Light grey background, adjust opacity as needed
         barmode='group',
-        height=600, width=800
+        height=600, width=800,
+        margin=dict(l=100, r=100, t=100, b=100)
         )
 
     # Set font for the bar labels, if you have them
-    fig.update_traces(textfont=dict(family=font_family, size=16, color='black'))
+    fig_non_stops.update_traces(textfont=dict(family=font_family, size=16, color='black'))
 
+    fig_one_stops.update_layout(
+        title='',
+        title_font=dict(family=font_family, size=22, color='black'),  # Match title style
+        xaxis=dict(
+            title='1 stop',
+            title_font=dict(family=font_family, size=18, color='black'),  # Match axis title style
+            tickfont=dict(family=font_family, size=14, color='black')  # Match axis tick labels
+        ),
+        yaxis=dict(showticklabels=False, showgrid=False
+        ),
+        paper_bgcolor='rgba(0,0,0,0)',  # Transparent background
+        plot_bgcolor='rgba(240, 240, 240, 0.8)',  # Light grey background, adjust opacity as needed
+        barmode='group',
+        height=600, width=800,
+        margin=dict(l=100, r=100, t=100, b=100)
+        )
+
+    # Set font for the bar labels, if you have them
+    fig_one_stops.update_traces(textfont=dict(family=font_family, size=16, color='black'))
+    
 
     plot_bgcolor = 'rgba(0,0,0,0)'  # This sets the background transparent
     paper_bgcolor = 'rgba(240, 240, 240, 0.8)'  # Streamlit's default grey background
 
-    # Display the figure in the Streamlit app
-    col1, col2, col3 = st.columns([1,4,1])  # Adjust the ratio as needed
+    # # Display the figure in the Streamlit app
+    # col1, col2, col3, col4 = st.columns([0.1,3,3,0.1])  # Adjust the ratio as needed
+    # with col2:
+    #     st.plotly_chart(fig_non_stops)
+    #     st.plotly_chart(fig_one_stops)
+    # Use st.columns to create two columns
+    col1, col2 = st.columns(2)  # Creates two columns with equal width by default
+
+    # Display non-stop flights bar chart in the first column
+    with col1:
+        st.plotly_chart(fig_non_stops)
+
+    # Display one-stop flights bar chart in the second column
     with col2:
-        st.plotly_chart(fig)
+        st.plotly_chart(fig_one_stops)
     # Add a horizontal line
     st.markdown("---")
     # spacer, col1, col2, col3, col4, spacer = st.columns([0.5, 10, 10, 10, 10, 1])
